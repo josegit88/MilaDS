@@ -33,20 +33,24 @@ def DSp_groups(
     """
     Detection and characterization of substructures in galaxy clusters,
     implementing the DS+ method by Biviano+2017.
-    
+
     Imputs:
-    
+
     Xcoor, Ycoor: Coordinates (x,y) in physical kpc of the cluster galaxies. (1-D array per coordinate)
     Vlos: Line-of-sight velocities in km/s of the cluster galaxies. (1-D array)
     Zclus: redshift of the cluster. (float)
     cluster_name: String with the name of the cluster data. Is completely optional, by default is "cluster_proofs"
     nsims: integer with number of simulations, by default is 1000.
-    Plim_P: minimun probability of DS+ selection, in percent
-    Ng_jump=None,
-    Ng_max=None,
-    compare_Method=None,
-    auth_i=None,
-    ddof=None,
+    Plim_P: minimun probability of DS+ selection, in percent, by deafult is 10 (10%)
+    Ng_jump: integer with number of multiplicity of assigned groups, by default is 3
+    Ng_max: integer with the maximun number of multipliplicity, by default is square(N_gal of the cluster)
+    compare_Method: type of profile comparison, you can select between: "NFW", "fit", "loess", by default is "loess"
+    auth_i: coeficients of model, by default is "MDvdB200"
+    ddof: degrees of freedom, by default is 1
+
+    Example running:
+
+    milaDS.DSp_groups(Xcoor=data_sample[:,1], Ycoor=data_sample[:,2], Vlos=data_sample[:,3], Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)
 
     """
 
