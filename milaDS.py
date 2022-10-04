@@ -34,7 +34,7 @@ def DSp_groups(
     Detection and characterization of substructures in galaxy clusters,
     implementing the DS+ method by Biviano+2017.
 
-    Imputs:
+    Inputs:
 
     Xcoor, Ycoor: Coordinates (x,y) in physical kpc of the cluster galaxies. (1-D array per coordinate)
     Vlos: Line-of-sight velocities in km/s of the cluster galaxies. (1-D array)
@@ -45,13 +45,20 @@ def DSp_groups(
     Ng_jump: integer with number of multiplicity of assigned groups, by default is 3
     Ng_max: integer with the maximun number of multipliplicity, by default is square(N_gal of the cluster)
     compare_Method: type of profile comparison, you can select between: "NFW", "fit", "loess", by default is "loess"
-    auth_i: coeficients of model, by default is "MDvdB200"
+    auth_i: coefficients of model, by default is "MDvdB200"
     ddof: degrees of freedom, by default is 1
+
+    Output:
+    
+    Return three arrays:
+        - individual information of each galaxy per multiplicity in each DS+ group
+        - information of assignment of DS+ groups, with no-overlaping galaxies
+        - summary of DS+ identified groups
 
     Example running:
 
-    milaDS.DSp_groups(Xcoor=data_sample[:,1], Ycoor=data_sample[:,2], Vlos=data_sample[:,3], Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)
-
+    milaDS.DSp_groups(Xcoor=data_sample[:,1], Ycoor=data_sample[:,2], Vlos=data_sample[:,3], Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)      
+    
     """
 
     cluster_name = "cluster_proofs" if cluster_name is None else cluster_name
@@ -648,7 +655,7 @@ def DSp_groups(
 
     # ****** Returns: ********
     print(len(summary_DS_grs), " DS+ groups detected")
-    return np.array([data_DS_substructure, allocation_data, summary_DS_grs])
+    return data_DS_substructure, allocation_data, summary_DS_grs
     # ************************
 
 
