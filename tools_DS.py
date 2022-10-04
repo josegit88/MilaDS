@@ -1,0 +1,517 @@
+# -*- coding: utf-8 -*-
+import numpy as np
+import pandas as pd
+import scipy
+
+
+# aperture velocity dispersion of NFW model at R=r_vir
+def sapovervv(c, anis=None):
+    if anis == None:
+        anis = "isotropic"
+        cfs = [0.344165, 0.312747, -0.336547, 0.0390675]
+
+    if anis == "ML":
+        cfs = [0.270654, 0.362998, -0.312684, 0.0161601]
+
+    lc = np.log10(c)
+    poly = cfs[0] + cfs[1] * lc + cfs[2] * (lc**2) + cfs[3] * (lc**3)
+    c2nfwapx = 10.0**poly
+    sapovervv = 1.0 / np.sqrt(c2nfwapx)
+    return sapovervv
+
+
+# general params of the cluster: V200, r200, M200
+def nfw_params(zave, sigmaap, cin, auth_i=None):
+    """
+    halo data params
+
+    Input:
+
+    zave is the average redshift of the cluster
+    sigmaap is the aperture velocity dispersion within r200
+    cin is a guess for the NFW M(r) concentration
+
+    r200 keyword if set, is used (in kpc)
+
+    Output:
+
+    Vvir[km/s], rvir[kpc],  Mvir[Msun]
+    """
+
+    grav = 43.0  # gravitational constant
+    h0 = 0.7
+    Omega0 = 0.3  # Omega_0
+    OmegaLambda = 0.7  # Omega_Lambda
+    hz = h0 * np.sqrt(Omega0 * ((1.0 + zave) ** 3) + OmegaLambda)
+    delta = 200.0
+    if auth_i is None:
+        auth_i = "MDvdB200"
+
+    anis = "ML"
+    vvguess = sigmaap / sapovervv(cin, anis)
+    rvguess = np.sqrt(2.0 / delta) / (0.001 * hz) * vvguess / 100.0  # in kpc
+
+    mvguess = 1.0e11 * rvguess * (vvguess / 100.0) ** 2 / grav  # in Msun
+
+    data_nfw = np.array([vvguess, rvguess, mvguess])
+
+    return data_nfw
+
+
+# -----------------------------------------------------------
+
+# ************** sigma NFW profile by Biviano code: ********************
+# concentration parameter for LCDM
+# (Maccio, Dutton & van den Bosch 08, relaxed halos, WMAP5, Delta=200)
+# (Maccio, Dutton & van den Bosch 08, relaxed halos, WMAP5, Delta=95)
+def cofmvir(mvir, auth):
+    if auth == "MDvdB200":
+        # print("caso 1")
+        ref = "MDvdB200"
+        slope = -0.098
+        norm = 6.76
+
+    if auth == "MDvdB":
+        # print("caso 2")
+        ref = "MDvdB"
+        slope = -0.094
+        norm = 9.35
+
+    cofmvir = norm * (mvir**slope)
+    return cofmvir
+
+
+# aperture velocity dispersion of NFW model at R=r_vir
+def sapovervv(c, anis=None):
+    if anis == None:
+        anis = "isotropic"
+        cfs = [0.344165, 0.312747, -0.336547, 0.0390675]
+
+    if anis == "ML":
+        cfs = [0.270654, 0.362998, -0.312684, 0.0161601]
+
+    lc = np.log10(c)
+    poly = cfs[0] + cfs[1] * lc + cfs[2] * (lc**2) + cfs[3] * (lc**3)
+    c2nfwapx = 10.0**poly
+    sapovervv = 1.0 / np.sqrt(c2nfwapx)
+    return sapovervv
+
+
+# sigma_los approx for NFW with ML anisotropy with radius r_a= 1 a
+def siglosnfwml1(x):
+    """
+    x: value to valuate projected velocity dispersion profile
+    """
+    lx = np.log10(x)
+    cfs = [
+        -0.14783,
+        -0.110877,
+        -0.135747,
+        0.00194757,
+        0.0231745,
+        0.000631017,
+        -0.00323355,
+        -0.000637035,
+    ]
+    poly = (
+        cfs[0]
+        + cfs[1] * lx
+        + cfs[2] * (lx**2)
+        + cfs[3] * (lx**3)
+        + cfs[4] * (lx**4)
+        + cfs[5] * (lx**5)
+        + cfs[6] * (lx**6)
+        + cfs[7] * (lx**7)
+    )
+    siglosnfwml1 = 10.0**poly
+    return siglosnfwml1
+
+
+# NFW mass function
+def massnfw(x, a, rvir):
+    massnfw = (np.log(1.0 + x / a) - x / (x + a)) / (
+        np.log(1.0 + rvir / a) - rvir / (rvir + a)
+    )
+    return massnfw
+
+
+# ----- sigma projected profile, equal number: ------
+def sigma_proj_en(Rxy, Vz, Nbins=None, ddof=None):
+    """
+    projected velocity dispertion profile, in equal width bins
+    """
+    Nbins = 5 if Nbins is None else Nbins
+    ddof = 0 if ddof is None else ddof
+
+    data = np.column_stack((Rxy, Vz))
+
+    data = data[data[:, 0].argsort()]
+
+    proj_vals_eq_numb = []
+    for jj in range(int(len(data) / Nbins), len(data), int(len(data) / Nbins)):
+        data_in_bin = data[jj - int(len(data) / Nbins) : jj, :]
+
+        mean_Rxy_j = np.mean(data_in_bin[:, 0])
+        sigma_z_j = np.std(data_in_bin[:, 1], ddof=ddof)
+
+        proj_vals_eq_numb.append((mean_Rxy_j, sigma_z_j))
+
+    proj_vals_eq_numb = np.array(proj_vals_eq_numb)
+    # 0:Rxy
+    # 3:sigma_z
+    # ------------------------------
+
+    return proj_vals_eq_numb
+
+
+# -------------------------------------------
+
+# Local Regression (LOESS) estimation routine.
+def loc_eval(x, b):
+    """
+    Evaluate `x` using locally-weighted regression parameters.
+    Degree of polynomial used in loess is inferred from b. `x`
+    is assumed to be a scalar.
+    """
+    loc_est = 0
+    for i in enumerate(b):
+        loc_est += i[1] * (x ** i[0])
+    return loc_est
+
+
+def loess(xvals, yvals, alpha, poly_degree=1, n=None, m=None):
+    """
+    Perform locally-weighted regression on xvals & yvals.
+    Variables used inside `loess` function:
+
+        n         => number of data points in xvals
+        m         => nbr of LOESS evaluation points
+        q         => number of data points used for each
+                     locally-weighted regression
+        v         => x-value locations for evaluating LOESS
+        locsDF    => contains local regression details for each
+                     location v
+        evalDF    => contains actual LOESS output for each v
+        X         => n-by-(poly_degree+1) design matrix
+        W         => n-by-n diagonal weight matrix for each
+                     local regression
+        y         => yvals
+        b         => local regression coefficient estimates.
+                     b = `(X^T*W*X)^-1*X^T*W*y`. Note that `@`
+                     replaces `np.dot` in recent numpy versions.
+        local_est => response for local regression
+    """
+    # Sort dataset by xvals.
+    all_data = sorted(zip(xvals, yvals), key=lambda x: x[0])
+    xvals, yvals = zip(*all_data)
+
+    locsDF = pd.DataFrame(
+        columns=[
+            "loc",
+            "x",
+            "weights",
+            "v",
+            "y",
+            "raw_dists",
+            "scale_factor",
+            "scaled_dists",
+        ]
+    )
+    evalDF = pd.DataFrame(columns=["loc", "est", "b", "v", "g"])
+
+    # n = len(xvals)
+    # m = n + 1
+    n = len(xvals) if n is None else n
+    m = n + 1 if m is None else m
+    q = int(np.floor(n * alpha) if alpha <= 1.0 else n)
+    avg_interval = (max(xvals) - min(xvals)) / len(xvals)
+    v_lb = max(0, min(xvals) - (0.5 * avg_interval))
+    v_ub = max(xvals) + (0.5 * avg_interval)
+    v = enumerate(np.linspace(start=v_lb, stop=v_ub, num=m), start=1)
+
+    # Generate design matrix based on poly_degree.
+    xcols = [np.ones_like(xvals)]
+    for j in range(1, (poly_degree + 1)):
+        xcols.append([i**j for i in xvals])
+    X = np.vstack(xcols).T
+
+    for i in v:
+
+        iterpos = i[0]
+        iterval = i[1]
+
+        # Determine q-nearest xvals to iterval.
+        iterdists = sorted(
+            [(j, np.abs(j - iterval)) for j in xvals], key=lambda x: x[1]
+        )
+
+        _, raw_dists = zip(*iterdists)
+
+        # Scale local observations by qth-nearest raw_dist.
+        scale_fact = raw_dists[q - 1]
+        scaled_dists = [(j[0], (j[1] / scale_fact)) for j in iterdists]
+        weights = [
+            (j[0], ((1 - np.abs(j[1] ** 3)) ** 3 if j[1] <= 1 else 0))
+            for j in scaled_dists
+        ]
+
+        # Remove xvals from each tuple:
+        _, weights = zip(*sorted(weights, key=lambda x: x[0]))
+        _, raw_dists = zip(*sorted(iterdists, key=lambda x: x[0]))
+        _, scaled_dists = zip(*sorted(scaled_dists, key=lambda x: x[0]))
+
+        iterDF1 = pd.DataFrame(
+            {
+                "loc": iterpos,
+                "x": xvals,
+                "v": iterval,
+                "weights": weights,
+                "y": yvals,
+                "raw_dists": raw_dists,
+                "scale_fact": scale_fact,
+                "scaled_dists": scaled_dists,
+            }
+        )
+
+        locsDF = pd.concat([locsDF, iterDF1])
+        W = np.diag(weights)
+        y = yvals
+        # b         = np.linalg.inv(X.T @ W @ X) @ (X.T @ W @ y)
+        b = np.matmul(
+            np.linalg.inv(np.matmul(np.matmul(X.T, W), X)),
+            np.matmul(np.matmul(X.T, W), y),
+        )
+        local_est = loc_eval(iterval, b)
+        iterDF2 = pd.DataFrame(
+            {"loc": [iterpos], "b": [b], "v": [iterval], "g": [local_est]}
+        )
+
+        evalDF = pd.concat([evalDF, iterDF2])
+
+    # Reset indicies for returned DataFrames.
+    locsDF.reset_index(inplace=True)
+    locsDF.drop("index", axis=1, inplace=True)
+    locsDF["est"] = 0
+    evalDF["est"] = 0
+    locsDF = locsDF[
+        [
+            "loc",
+            "est",
+            "v",
+            "x",
+            "y",
+            "raw_dists",
+            "scale_fact",
+            "scaled_dists",
+            "weights",
+        ]
+    ]
+
+    # Reset index for evalDF.
+    evalDF.reset_index(inplace=True)
+    evalDF.drop("index", axis=1, inplace=True)
+    evalDF = evalDF[["loc", "est", "v", "b", "g"]]
+
+    return (locsDF, evalDF)
+
+
+"""
+Local Regression (LOESS) estimation routine with optional 
+iterative robust estimation procedure. Setting `robustify=True` 
+indicates that the robust estimation procedure should be 
+performed. 
+"""
+
+
+def loess_robustify(xvals, yvals, alpha, poly_degree=1, robustify=False):
+    """
+    Perform locally-weighted regression via xvals & yvals.
+    Variables used within `loess` function:
+
+        n         => number of data points in xvals
+        m         => nbr of LOESS evaluation points
+        q         => number of data points used for each
+                     locally-weighted regression
+        v         => x-value locations for evaluating LOESS
+        locsDF    => contains local regression details for each
+                     location v
+        evalDF    => contains actual LOESS output for each v
+        X         => n-by-(poly_degree+1) design matrix
+        W         => n-by-n diagonal weight matrix for each
+                     local regression
+        y         => yvals
+        b         => local regression coefficient estimates.
+                     b = `(X^T*W*X)^-1*X^T*W*y`. Note that `@`
+                     replaces np.dot in recent numpy versions.
+        local_est => response for local regression
+    """
+    # sort dataset by xvals:
+    all_data = sorted(zip(xvals, yvals), key=lambda x: x[0])
+    xvals, yvals = zip(*all_data)
+
+    locsDF = pd.DataFrame(
+        columns=[
+            "loc",
+            "x",
+            "weights",
+            "v",
+            "y",
+            "raw_dists",
+            "scale_factor",
+            "scaled_dists",
+        ]
+    )
+    evalDF = pd.DataFrame(columns=["loc", "est", "b", "v", "g"])
+
+    n = len(xvals)
+    m = n + 1
+    q = int(np.floor(n * alpha) if alpha <= 1.0 else n)
+    avg_interval = (max(xvals) - min(xvals)) / len(xvals)
+    v_lb = max(0, min(xvals) - (0.5 * avg_interval))
+    v_ub = max(xvals) + (0.5 * avg_interval)
+    v = enumerate(np.linspace(start=v_lb, stop=v_ub, num=m), start=1)
+
+    # Generate design matrix based on poly_degree.
+    xcols = [np.ones_like(xvals)]
+    for j in range(1, (poly_degree + 1)):
+        xcols.append([i**j for i in xvals])
+    X = np.vstack(xcols).T
+
+    for i in v:
+
+        iterpos = i[0]
+        iterval = i[1]
+
+        # Determine q-nearest xvals to iterval.
+        iterdists = sorted(
+            [(j, np.abs(j - iterval)) for j in xvals], key=lambda x: x[1]
+        )
+
+        _, raw_dists = zip(*iterdists)
+
+        # Scale local observations by qth-nearest raw_dist.
+        scale_fact = raw_dists[q - 1]
+        scaled_dists = [(j[0], (j[1] / scale_fact)) for j in iterdists]
+        weights = [
+            (j[0], ((1 - np.abs(j[1] ** 3)) ** 3 if j[1] <= 1 else 0))
+            for j in scaled_dists
+        ]
+
+        # Remove xvals from each tuple:
+        _, weights = zip(*sorted(weights, key=lambda x: x[0]))
+        _, raw_dists = zip(*sorted(iterdists, key=lambda x: x[0]))
+        _, scaled_dists = zip(*sorted(scaled_dists, key=lambda x: x[0]))
+
+        iterDF1 = pd.DataFrame(
+            {
+                "loc": iterpos,
+                "x": xvals,
+                "v": iterval,
+                "weights": weights,
+                "y": yvals,
+                "raw_dists": raw_dists,
+                "scale_fact": scale_fact,
+                "scaled_dists": scaled_dists,
+            }
+        )
+
+        locsDF = pd.concat([locsDF, iterDF1])
+        W = np.diag(weights)
+        y = yvals
+        # b = np.linalg.inv(X.T @ W @ X) @ (X.T @ W @ y)
+        b = np.matmul(
+            np.linalg.inv(np.matmul(np.matmul(X.T, W), X)),
+            np.matmul(np.matmul(X.T, W), y),
+        )
+        local_est = loc_eval(iterval, b)
+
+        iterDF2 = pd.DataFrame(
+            {"loc": [iterpos], "b": [b], "v": [iterval], "g": [local_est]}
+        )
+
+        evalDF = pd.concat([evalDF, iterDF2])
+
+    # Reset indicies for returned DataFrames.
+    locsDF.reset_index(inplace=True)
+    locsDF.drop("index", axis=1, inplace=True)
+    locsDF["est"] = 0
+    evalDF["est"] = 0
+    locsDF = locsDF[
+        [
+            "loc",
+            "est",
+            "v",
+            "x",
+            "y",
+            "raw_dists",
+            "scale_fact",
+            "scaled_dists",
+            "weights",
+        ]
+    ]
+
+    if robustify == True:
+
+        cycle_nbr = 1
+        robust_est = [evalDF]
+
+        while True:
+            # Perform iterative robustness procedure for each local regression.
+            # Evaluate local regression for each item in xvals.
+            #
+            # e1_i => raw residuals
+            # e2_i => scaled residuals
+            # r_i  => robustness weight
+            revalDF = pd.DataFrame(columns=["loc", "est", "v", "b", "g"])
+
+            for i in robust_est[-1]["loc"]:
+
+                prevDF = robust_est[-1]
+                locDF = locsDF[locsDF["loc"] == i]
+                b_i = prevDF.loc[prevDF["loc"] == i, "b"].item()
+                w_i = locDF["weights"]
+                v_i = prevDF.loc[prevDF["loc"] == i, "v"].item()
+                g_i = prevDF.loc[prevDF["loc"] == i, "g"].item()
+                e1_i = [k - loc_eval(j, b_i) for (j, k) in zip(xvals, yvals)]
+                e2_i = [j / (6 * np.median(np.abs(e1_i))) for j in e1_i]
+                r_i = [(1 - np.abs(j**2)) ** 2 if np.abs(j) < 1 else 0 for j in e2_i]
+                w_f = [j * k for (j, k) in zip(w_i, r_i)]  # new weights
+                W_r = np.diag(w_f)
+                # b_r = np.linalg.inv(X.T @ W_r @ X) @ (X.T @ W_r @ y)
+                b_r = np.matmul(
+                    np.linalg.inv(np.matmul(np.matmul(X.T, W_r), X)),
+                    np.matmul(np.matmul(X.T, W_r), y),
+                )
+                riter_est = loc_eval(v_i, b_r)
+
+                riterDF = pd.DataFrame(
+                    {
+                        "loc": [i],
+                        "b": [b_r],
+                        "v": [v_i],
+                        "g": [riter_est],
+                        "est": [cycle_nbr],
+                    }
+                )
+
+                revalDF = pd.concat([revalDF, riterDF])
+            robust_est.append(revalDF)
+
+            # Compare `g` vals from two latest revalDF's in robust_est.
+            idiffs = np.abs(
+                (robust_est[-2]["g"] - robust_est[-1]["g"]) / robust_est[-2]["g"]
+            )
+
+            if (np.all(idiffs < 0.005)) or cycle_nbr > 50:
+                break
+
+            cycle_nbr += 1
+
+        # Vertically bind all DataFrames from robust_est.
+        evalDF = pd.concat(robust_est)
+
+    evalDF.reset_index(inplace=True)
+    evalDF.drop("index", axis=1, inplace=True)
+    evalDF = evalDF[["loc", "est", "v", "b", "g"]]
+
+    return (locsDF, evalDF)
