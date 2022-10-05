@@ -382,7 +382,7 @@ def DSp_groups(
         + str(cluster_name)
         + "_"
         + str(nsims)
-        + "sims.txt",
+        + "sims.dat",
         data_DS_substructure,
         header=data_header,
         fmt=[
@@ -576,7 +576,7 @@ def DSp_groups(
         + str(nsims)
         + "sims_cluster_N_"
         + str(cluster_name)
-        + ".txt",
+        + ".dat",
         allocation_data,
         header=data_header_allocate,
         fmt=[
@@ -652,7 +652,7 @@ def DSp_groups(
             + str(nsims)
             + "sims_cluster_N_"
             + str(cluster_name)
-            + ".txt",
+            + ".dat",
             summary_DS_grs,
             header=data_header_summary,
             fmt=[
