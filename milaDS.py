@@ -49,7 +49,7 @@ def DSp_groups(
     ddof: degrees of freedom, by default is 1
 
     Output:
-    
+
     Return three arrays:
         - individual information of each galaxy per multiplicity in each DS+ group
         - information of assignment of DS+ groups, with no-overlaping galaxies
@@ -57,8 +57,8 @@ def DSp_groups(
 
     Example running:
 
-    milaDS.DSp_groups(Xcoor=data_sample[:,1], Ycoor=data_sample[:,2], Vlos=data_sample[:,3], Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)      
-    
+    milaDS.DSp_groups(Xcoor=data_sample[:,1], Ycoor=data_sample[:,2], Vlos=data_sample[:,3], Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)
+
     """
 
     cluster_name = "cluster_proofs" if cluster_name is None else cluster_name
@@ -203,7 +203,8 @@ def DSp_groups(
             ]
 
             # size of the group:
-            size_group_i = data_idx_and_dist_sort[Ng_j - 1, 1]
+            # size_group_i = data_idx_and_dist_sort[Ng_j - 1, 1]
+            # size_group_i = tools_DS.size_group_mutualdistance_2D(data_glx_in_cluster[1:3, :])
 
             idx_interest = data_idx_and_dist_sort[0:Ng_j, 0].astype(
                 "int32"
@@ -212,6 +213,12 @@ def DSp_groups(
             data_glx_interest = data_glx_in_cluster[
                 idx_interest, :
             ]  # here we have the interest galaxies, now we go to calculate the rest!
+
+            # size of the group:
+            size_group_i = tools_DS.size_group_mutualdistance_2D(
+                data_glx_interest[1:3, :]
+            )
+
             av_dist = np.mean(data_glx_interest[:, 4])  # average distance to BCG
             dist_gr_r200units = av_dist / r200_clus
             # sigma_cl_at_GroupDist = V_cl_at_GroupDist/np.sqrt(3.) #sigma_LOS
@@ -621,10 +628,13 @@ def DSp_groups(
         dist_gri = np.mean(subgr_i[:, 4])
         size_gri = np.mean(subgr_i[:, 5])
         sigma_gri = np.mean(subgr_i[:, 6])
+        Vmean_gri = np.mean(subgr_i[:, 11])
         p_min = min(subgr_i[:, 7])
         p_avr = np.mean(subgr_i[:, 7])
 
-        summary_DS_grs.append((gi, Ng_gri, dist_gri, size_gri, sigma_gri, p_min, p_avr))
+        summary_DS_grs.append(
+            (gi, Ng_gri, dist_gri, size_gri, sigma_gri, Vmean_gri, p_min, p_avr)
+        )
 
     summary_DS_grs = np.array(summary_DS_grs)
 
@@ -633,9 +643,7 @@ def DSp_groups(
 
     if len(summary_DS_grs) > 1:
         summary_DS_grs = summary_DS_grs[summary_DS_grs[:, 0].argsort()]
-        data_header_summary = (
-            "  GrNr    Ngal    Rij(kpc)  size(kpc)  sigm(km/s)  Pmin(ds)   Pmin_avr(ds)"
-        )
+        data_header_summary = "  GrNr    Ngal    Rij(kpc)  size(kpc)  sigm(km/s)  Vmean(km/s) Pmin(ds)   Pmin_avr(ds)"
         np.savetxt(
             path_data_DS_results
             + "summary_data_DS_groups_"
@@ -647,7 +655,16 @@ def DSp_groups(
             + ".txt",
             summary_DS_grs,
             header=data_header_summary,
-            fmt=["%7.f", "%7.f", "%11.2f", "%10.2f", "%10.2f", "%10.4f", "%10.4f"],
+            fmt=[
+                "%7.f",
+                "%7.f",
+                "%11.2f",
+                "%10.2f",
+                "%10.2f",
+                "%10.2f",
+                "%10.4f",
+                "%10.4f",
+            ],
         )
 
     print("end summary DS+ groups")

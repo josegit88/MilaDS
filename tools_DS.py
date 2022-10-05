@@ -166,6 +166,42 @@ def sigma_proj_en(Rxy, Vz, Nbins=None, ddof=None):
 
 # -------------------------------------------
 
+# ------------ group size: as the average of mutual distance ----------------
+def elements_below_diag_matriz_NN(matriz):
+    elements = []
+    for x in range(len(matriz[0])):
+        for y in range(x):
+            # print x,y   # Mostrar la celda que se sumara.
+            elements.append(matriz[x, y])
+    return np.array(elements)
+
+
+def size_group_mutualdistance_2D(xy):
+    """
+    Estimate the size of a distribution of galaxies as the
+    average of mutual distance. Fot this in necessary to
+    introduce a 2D array with the values of xy positions
+    """
+
+    Ngal = len(xy)
+
+    matriz_Rij = np.zeros((Ngal, Ngal))
+
+    # calculo de las distancias mutuas:
+    for ii in range(Ngal):
+        # ii = 0
+        dist_to_glx_i = np.sqrt(
+            (xy[:, 0] - xy[ii, 0]) ** 2 + (xy[:, 1] - xy[ii, 1]) ** 2
+        )
+        matriz_Rij[ii, :] = dist_to_glx_i
+
+    size_gr_2D = np.mean(elements_below_diag_matriz_NN(matriz_Rij))
+
+    return size_gr_2D
+
+
+# ---------------------------------------------------------------------------
+
 # Local Regression (LOESS) estimation routine.
 def loc_eval(x, b):
     """
