@@ -26,6 +26,8 @@ def DSp_groups(
     Plim_P=None,
     Ng_jump=None,
     Ng_max=None,
+    overlapping_groups=False,
+    anti_fragmentation=True,
     compare_Method=None,
     auth_i=None,
     ddof=None,
@@ -44,6 +46,8 @@ def DSp_groups(
     Plim_P: minimun probability of DS+ selection, in percent, by deafult is 10 (10%)
     Ng_jump: integer with number of multiplicity of assigned groups, by default is 3
     Ng_max: integer with the maximun number of multipliplicity, by default is square(N_gal of the cluster)
+    overlapping_groups: If False, then when a galaxy is assigned to a DS+ group, all other groups to which that galaxy belongs are discarded, by default is False
+    anti_fragmentation: Combine one or more DS+ groups when the criteria of closeness and average group velocity are met, by defalut is True, and is necessary that overlapping_groups=False
     compare_Method: type of profile comparison, you can select between: "NFW", "fit", "loess", by default is "loess"
     auth_i: coefficients of model, by default is "MDvdB200"
     ddof: degrees of freedom, by default is 1
@@ -499,6 +503,14 @@ def DSp_groups(
             print(" few members")
             continue
 
+        # ++++++++ overlapping condition: +++++++++
+        if overlapping_groups == False:
+            if np.sum(allocation_data[idx_interest, 8]) != -1 * len(idx_interest):
+                continue
+        if overlapping_groups == True:
+            pass
+        # +++++++++++++++++++++++++++++++++++++++++
+
         # print "Ngals:", Ngal_i
         for jj in idx_interest:
             # print "gal_j:", jj
@@ -565,6 +577,82 @@ def DSp_groups(
         rows_GrNr = np.where(allocation_data[:, 8] == gn)[0]
         Ngalf_gr = len(rows_GrNr)
         allocation_data[rows_GrNr, 3] = Ngalf_gr
+
+    # =============== anti-fragmentation process: ====================
+    if overlapping_groups == False and anti_fragmentation == True:
+        list_Gr_DS = []
+        pmin_Gr_DS = []
+        for gg in range(len(allocation_data)):
+            gr_X = allocation_data[gg, 8].astype("int32")
+            data_gr_X = allocation_data[allocation_data[:, 8] == gr_X]
+            pmin = min(data_gr_X[:, 7])
+            Ng_X = data_gr_X[0, 3]
+            if gr_X == -1:
+                continue
+            if gr_X not in list_Gr_DS:
+                list_Gr_DS.append(gr_X)
+                pmin_Gr_DS.append((pmin, Ng_X))
+
+        list_Gr_DS = np.column_stack((list_Gr_DS, pmin_Gr_DS))
+        list_Gr_DS = list_Gr_DS[list_Gr_DS[:, 1].argsort()]
+        # -------------------------------
+
+        merg_lost = []
+        merg_add = []
+        for ii in range(len(list_Gr_DS)):
+            gr_i = list_Gr_DS[ii, 0].astype("int32")
+            if gr_i in merg_lost:
+                continue
+            data_gr_i = allocation_data[allocation_data[:, 8] == gr_i]
+            center_gri = [np.mean(data_gr_i[:, 9]), np.mean(data_gr_i[:, 10])]
+            dist_to_cent_gr_i = np.sqrt(
+                (data_gr_i[:, 9] - center_gri[0]) ** 2
+                + (data_gr_i[:, 10] - center_gri[1]) ** 2
+            )
+            max_dist_i = max(dist_to_cent_gr_i)
+            Vmean_gr_i = np.mean(data_gr_i[:, 11])
+            V_to_gr_i = data_gr_i[:, 11] - Vmean_gr_i
+            max_Vmean_gr_i = max(V_to_gr_i)
+
+            centers_grs = []
+            for jj in range(len(list_Gr_DS)):
+                gr_j = list_Gr_DS[jj, 0].astype("int32")
+                if gr_j == gr_i:
+                    continue
+                if gr_j in merg_lost:
+                    continue
+                data_gr_j = allocation_data[allocation_data[:, 8] == gr_j]
+                center_grj = [np.mean(data_gr_j[:, 9]), np.mean(data_gr_j[:, 10])]
+                dist_to_cent_gr_j = np.sqrt(
+                    (data_gr_j[:, 9] - center_grj[0]) ** 2
+                    + (data_gr_j[:, 10] - center_grj[1]) ** 2
+                )
+                max_dist_j = max(dist_to_cent_gr_j)
+                Vmean_gr_j = np.mean(data_gr_j[:, 11])
+                V_to_gr_j = data_gr_j[:, 11] - Vmean_gr_j
+                max_Vmean_gr_j = max(np.abs(V_to_gr_j))
+
+                d_ij = np.sqrt(
+                    (center_gri[0] - center_grj[0]) ** 2
+                    + (center_gri[1] - center_grj[1]) ** 2
+                )
+
+                # condition for keep the merge:
+                if d_ij < max(max_dist_i, max_dist_j) and np.abs(
+                    Vmean_gr_i - Vmean_gr_j
+                ) < max(np.abs(max_Vmean_gr_i), np.abs(max_Vmean_gr_j)):
+                    print("merge between gr_i:", gr_i, "and gr_j:", gr_j)
+                    merg_lost.append(gr_j)
+                    merg_add.append(gr_i)
+
+        merg_lost = np.column_stack((merg_add, merg_lost))
+
+        for mm in range(len(merg_lost)):
+            gr_add_i = merg_lost[mm, 0]
+            gr_lost_i = merg_lost[mm, 1]
+            row_gr_merg = np.where(allocation_data[:, 9] == gr_lost_i)[0]
+            allocation_data[row_gr_merg, 9] = gr_add_i
+    # ================================================================
 
     # save results:
     data_header_allocate = " idx_gal   shID  Ngali  Ngalf    Rij(kpc)  size(kpc)  sigm(km/s)  Pmin(ds)    GrNr    x(kpc)    y(kpc)   V_LOS(km/s)"
