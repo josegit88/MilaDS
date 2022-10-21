@@ -59,7 +59,7 @@ def DSp_groups(
         - information of assignment of DS+ groups, with no-overlaping galaxies
         - summary of DS+ identified groups
 
-    Example running:
+    Example brief running:
 
     milaDS.DSp_groups(Xcoor=data_sample[:,1], Ycoor=data_sample[:,2], Vlos=data_sample[:,3], Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)
 
