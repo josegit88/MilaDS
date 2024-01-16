@@ -1,5 +1,5 @@
 # MilaDS
-Substructure identificator using the DS+ method
+Substructure identifier in galaxy clusters using the DS+ method, version of the code developed in Python
 
 ----
 
@@ -8,7 +8,7 @@ Substructure identificator using the DS+ method
 
 ## Motivation
 
-The study of cluster substructures in galaxy clusters is important for the determine their dynamical status, assembly history, and the evolution of cluster in general. In this repo we present a python code version of our **DS+** method for the identification and characterization of substructures in clusters. This new method is based on the projected positions and line-of-sight velocities of cluster galaxies, and it is an improvement and extension of the traditional method of [Dressler & Shectman (1988)](https://articles.adsabs.harvard.edu/pdf/1988AJ.....95..985D). For especifications or details please check our main paper [DS+, link here](https://www.aanda.org/articles/aa/full_html/2023/01/aa45422-22/aa45422-22.html)
+The study of cluster substructures in galaxy clusters is important for determining their dynamical status, assembly history, and the evolution of clusters in general. In this repo, we present a Python code version of our **DS+** method for the identification and characterization of substructures in clusters. This new method is based on the projected positions and line-of-sight velocities of cluster galaxies, and it is an improvement and extension of the traditional method of [Dressler & Shectman (1988)](https://articles.adsabs.harvard.edu/pdf/1988AJ.....95..985D). For specifications or details please check our main paper [DS+, link here](https://www.aanda.org/articles/aa/full_html/2023/01/aa45422-22/aa45422-22.html)
 
 
 ## Quick start
