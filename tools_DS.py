@@ -14,8 +14,8 @@ def sapovervv(c, anis=None):
         cfs = [0.270654, 0.362998, -0.312684, 0.0161601]
 
     lc = np.log10(c)
-    poly = cfs[0] + cfs[1] * lc + cfs[2] * (lc**2) + cfs[3] * (lc**3)
-    c2nfwapx = 10.0**poly
+    poly = cfs[0] + cfs[1] * lc + cfs[2] * (lc ** 2) + cfs[3] * (lc ** 3)
+    c2nfwapx = 10.0 ** poly
     sapovervv = 1.0 / np.sqrt(c2nfwapx)
     return sapovervv
 
@@ -77,7 +77,7 @@ def cofmvir(mvir, auth):
         slope = -0.094
         norm = 9.35
 
-    cofmvir = norm * (mvir**slope)
+    cofmvir = norm * (mvir ** slope)
     return cofmvir
 
 
@@ -91,8 +91,8 @@ def sapovervv(c, anis=None):
         cfs = [0.270654, 0.362998, -0.312684, 0.0161601]
 
     lc = np.log10(c)
-    poly = cfs[0] + cfs[1] * lc + cfs[2] * (lc**2) + cfs[3] * (lc**3)
-    c2nfwapx = 10.0**poly
+    poly = cfs[0] + cfs[1] * lc + cfs[2] * (lc ** 2) + cfs[3] * (lc ** 3)
+    c2nfwapx = 10.0 ** poly
     sapovervv = 1.0 / np.sqrt(c2nfwapx)
     return sapovervv
 
@@ -116,14 +116,14 @@ def siglosnfwml1(x):
     poly = (
         cfs[0]
         + cfs[1] * lx
-        + cfs[2] * (lx**2)
-        + cfs[3] * (lx**3)
-        + cfs[4] * (lx**4)
-        + cfs[5] * (lx**5)
-        + cfs[6] * (lx**6)
-        + cfs[7] * (lx**7)
+        + cfs[2] * (lx ** 2)
+        + cfs[3] * (lx ** 3)
+        + cfs[4] * (lx ** 4)
+        + cfs[5] * (lx ** 5)
+        + cfs[6] * (lx ** 6)
+        + cfs[7] * (lx ** 7)
     )
-    siglosnfwml1 = 10.0**poly
+    siglosnfwml1 = 10.0 ** poly
     return siglosnfwml1
 
 
@@ -133,6 +133,68 @@ def massnfw(x, a, rvir):
         np.log(1.0 + rvir / a) - rvir / (rvir + a)
     )
     return massnfw
+
+
+def nfwvdp_proj(zave, sigmaap, cin, rrv, r200=None, auth_i=None):
+    """
+    VDP from NFW M(r) and given beta(r)
+
+    Input:
+
+    zave is the average redshift of the cluster
+    sigmaap is the aperture velocity dispersion within r200
+    cin is a guess for the NFW M(r) concentration
+    rrv are the radii in units of r200 where to compute the VDP
+
+    r200 keyword if set, is used (in kpc)
+
+    Output:
+
+    vdp is the VDP in units of sigmaap
+    """
+
+    grav = 43.0  # gravitational constant
+    h0 = 0.7
+    Omega0 = 0.3  # Omega_0
+    OmegaLambda = 0.7  # Omega_Lambda
+    hz = h0 * np.sqrt(Omega0 * ((1.0 + zave) ** 3) + OmegaLambda)
+    delta = 200.0
+    if auth_i is None:
+        auth_i = "MDvdB200"
+
+    # guessing rvir using sigma_ap/v_vir as predicted
+    # from NFW with concentration of c (=4 on 1st pass)
+
+    anis = "ML"
+    if r200 == None:
+        vvguess = sigmaap / sapovervv(cin, anis)
+        rvguess = np.sqrt(2.0 / delta) / (0.001 * hz) * vvguess / 100.0  # in kpc
+        # print 'v200 and r200 evaluated: ', vvguess, rvguess
+
+    if r200 != None:
+        rvguess = r200
+        vvguess = 10.0 * hz * 1.0e2 * r200 / 1.0e3
+        # print 'v200 and r200 given: ', vvguess, rvguess
+
+    mvguess = 1.0e11 * rvguess * (vvguess / 100.0) ** 2 / grav  # in Msun
+    # print 'mass from v200 and r200: ', mvguess, ' at z=', zave
+
+    # LCDM concentration
+
+    c = cofmvir(mvguess / 1.0e12, auth=auth_i)
+    mdelta = mvguess
+
+    # print "concentration used = ",c
+
+    rrv_i = rrv
+    vdp_i = (
+        siglosnfwml1(c * rrv_i)
+        * np.sqrt(massnfw(1.0 / c, 1.0 / c, 1.0) * c)
+        * vvguess
+        / sigmaap
+    )
+
+    return vdp_i
 
 
 # ----- sigma projected profile, equal number: ------
@@ -268,7 +330,7 @@ def loess(xvals, yvals, alpha, poly_degree=1, n=None, m=None):
     # Generate design matrix based on poly_degree.
     xcols = [np.ones_like(xvals)]
     for j in range(1, (poly_degree + 1)):
-        xcols.append([i**j for i in xvals])
+        xcols.append([i ** j for i in xvals])
     X = np.vstack(xcols).T
 
     for i in v:

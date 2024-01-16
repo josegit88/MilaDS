@@ -112,7 +112,7 @@ def DSp_groups(
         * 1.0
         / (10.0 * H0 * (1 + Z_i) ** 1.5)
     )
-    r200_clus_M1 = G * M200_clus_M1 / (V200_clus**2.0)
+    r200_clus_M1 = G * M200_clus_M1 / (V200_clus ** 2.0)
 
     conc_Biv = 6.76 * ((M200_clus_M1 / 1e12) ** (-0.098))
     params_cluster = tools_DS.nfw_params(
@@ -152,14 +152,14 @@ def DSp_groups(
         r_fit = np.linspace(r_min, r_max + 800, 1000)
 
         sigma_fit = (
-            coef_fit_sigma[0] * (r_fit**3)
-            + coef_fit_sigma[1] * (r_fit**2)
+            coef_fit_sigma[0] * (r_fit ** 3)
+            + coef_fit_sigma[1] * (r_fit ** 2)
             + coef_fit_sigma[2] * (r_fit)
             + coef_fit_sigma[3]
         )
         func_sigma = (
-            lambda Rpos: coef_fit_sigma[0] * (Rpos**3)
-            + coef_fit_sigma[1] * (Rpos**2)
+            lambda Rpos: coef_fit_sigma[0] * (Rpos ** 3)
+            + coef_fit_sigma[1] * (Rpos ** 2)
             + coef_fit_sigma[2] * (Rpos)
             + coef_fit_sigma[3]
         )
@@ -171,7 +171,7 @@ def DSp_groups(
     Ypos = data_glx_in_cluster[:, 2]
     Vel_LOS = data_glx_in_cluster[:, 3]
 
-    Rij_to_center = np.sqrt(Xpos**2 + Ypos**2)
+    Rij_to_center = np.sqrt(Xpos ** 2 + Ypos ** 2)
 
     data_glx_in_cluster = np.column_stack((sh_id, Xpos, Ypos, Vel_LOS, Rij_to_center))
 
@@ -229,7 +229,7 @@ def DSp_groups(
 
             # using NFW profile:
             if compare_Method == "NFW":
-                sigma_cl_at_GroupDist = sigma_1D_clus * miladis.nfwvdp_proj(
+                sigma_cl_at_GroupDist = sigma_1D_clus * tools_DS.nfwvdp_proj(
                     zave=Zclus,
                     sigmaap=sigma_1D_clus,
                     cin=conc_Biv,
@@ -254,8 +254,8 @@ def DSp_groups(
                     sigma_mean_int = 10 ** l_y[-1]  # 1st value
 
                 if av_dist > 10 ** l_x[0] and av_dist < 10 ** l_x[-1]:
-                    R_up = np.where(10**l_x >= av_dist)[0][0]
-                    R_down = np.where(10**l_x < av_dist)[0][-1]
+                    R_up = np.where(10 ** l_x >= av_dist)[0][0]
+                    R_down = np.where(10 ** l_x < av_dist)[0][-1]
                     R_mean_int = np.mean(
                         [10 ** l_x[R_up], 10 ** l_x[R_down]]
                     )  # simple interpolation
@@ -277,7 +277,7 @@ def DSp_groups(
 
             # delta v:
             delta_v = (
-                Ng_j**0.5
+                Ng_j ** 0.5
                 * np.abs(V_mean_group - Vmean_clus)
                 / (t_Student * sigma_cl_at_GroupDist)
             )
@@ -309,7 +309,7 @@ def DSp_groups(
 
                 # delta v:
                 delta_v_sim = (
-                    Ng_j**0.5
+                    Ng_j ** 0.5
                     * np.abs(V_mean_group_sim - Vmean_clus)
                     / (t_Student * sigma_cl_at_GroupDist)
                 )
