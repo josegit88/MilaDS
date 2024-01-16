@@ -36,7 +36,7 @@ milaDS.DSp_groups(Xcoor=X_data, Ycoor=Y_data, Vlos=Vlos_data, Zclus=0.296, clust
 Please acknowledge by citing the project and using the following DOI as reference:
 J. Benavides, A. Biviano & M. Abadi (2023), [DS+ paper, link here](https://www.aanda.org/articles/aa/full_html/2023/01/aa45422-22/aa45422-22.html)
 
-ou may also use the the following BibTex:
+You may also use the the following BibTex:
 
 ```
 @ARTICLE{2023A&A...669A.147B,
