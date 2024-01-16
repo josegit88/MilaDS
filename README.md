@@ -28,7 +28,7 @@ Example of running program:
 Example running:
 
 ```
-milaDS.DSp_groups(Xcoor=data_sample[:,1], Ycoor=data_sample[:,2], Vlos=data_sample[:,3], Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)
+milaDS.DSp_groups(Xcoor=X_data, Ycoor=Y_data, Vlos=Vlos_data, Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)
 ```
 
 ## Citations
