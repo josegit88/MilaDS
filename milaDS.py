@@ -1,3 +1,11 @@
+# Jose Benavides (jose.astroph@gmail.com)
+
+# This file is part of the
+#   MilaDS project (https://github.com/josegit88/MilaDS).
+# Copyright (c) 2023, Jose Benavides
+# License: MIT
+#   Full Text: https://github.com/josegit88/MilaDS/blob/main/LICENSE
+
 # -*- coding: utf-8 -*-
 import numpy as np
 import os
