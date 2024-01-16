@@ -14,7 +14,7 @@ The study of cluster substructures in galaxy clusters is important for determini
 ## Quick start
 
 Input:
-Basic information of galaxies into the cluster, (X,Y,Vlos, redshift, others)
+Basic information of galaxies into the cluster, (X/kpc, Y/kpc, Vlos/km s^-1, redshift, others)
 
 Output:
     
