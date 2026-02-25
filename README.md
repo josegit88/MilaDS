@@ -8,24 +8,22 @@ Substructure identifier in galaxy clusters using the DS+ method, version of the 
 
 ## Motivation
 
-The study of cluster substructures in galaxy clusters is important for determining their dynamical status, assembly history, and the evolution of clusters in general. In this repo, we present a Python code version of our **DS+** method for the identification and characterization of substructures in clusters. This new method is based on the projected positions and line-of-sight velocities of cluster galaxies, and it is an improvement and extension of the traditional method of [Dressler & Shectman (1988)](https://articles.adsabs.harvard.edu/pdf/1988AJ.....95..985D). For specifications or details please check our main paper [DS+, link here](https://www.aanda.org/articles/aa/full_html/2023/01/aa45422-22/aa45422-22.html)
+The study of substructures in galaxy clusters is essential for determining their dynamical state, assembly history, and overall evolution. In this repository, we present a Python implementation of our **DS+** method for the identification and characterization of substructures in galaxy clusters. This method is based on the projected positions and line-of-sight velocities of cluster galaxies, and represents an improvement and extension of the traditional approach introduced by [Dressler & Shectman (1988)](https://articles.adsabs.harvard.edu/pdf/1988AJ.....95..985D). For further details and technical specifications, please refer to our main paper: [DS+, link here](https://www.aanda.org/articles/aa/full_html/2023/01/aa45422-22/aa45422-22.html)
 
 
 ## Quick start
 
 Input:
-Basic information of galaxies into the cluster, (X/kpc, Y/kpc, Vlos/km s^-1, redshift, others)
+Basic information for galaxies in the cluster:, (X/kpc, Y/kpc, Vlos/km s^-1, redshift, others)
 
 Output:
     
-Return three arrays:
-    - individual information of each galaxy per multiplicity in each DS+ group
-    - information of assignment of DS+ groups, with no-overlaping galaxies
-    - summary of DS+ identified groups
+The program returns three arrays:
+    - Individual information for each galaxy, organized by multiplicity within each DS+ group
+    - Assignment information for DS+ groups, with no overlapping galaxies
+    - A summary of the identified DS+ groups
 
 Example of running program:
-
-Example running:
 
 ```
 milaDS.DSp_groups(Xcoor=X_data, Ycoor=Y_data, Vlos=Vlos_data, Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)
