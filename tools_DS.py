@@ -1,11 +1,3 @@
-# Jose Benavides (jose.astroph@gmail.com)
-
-# This file is part of the
-#   MilaDS project (https://github.com/josegit88/MilaDS).
-# Copyright (c) 2023, Jose Benavides
-# License: MIT
-#   Full Text: https://github.com/josegit88/MilaDS/blob/main/LICENSE
-
 # -*- coding: utf-8 -*-
 import numpy as np
 import pandas as pd
@@ -419,3 +411,14 @@ def loess(xvals, yvals, alpha, poly_degree=1, n=None, m=None):
     evalDF = evalDF[["loc", "est", "v", "b", "g"]]
 
     return (locsDF, evalDF)
+
+
+# gapper to estimate the "dispersion" in case of "few" objects
+def gapper_scale(data):
+    data = np.sort(data)
+    n = len(data)
+
+    gaps = data[1:] - data[:-1]
+    weights = np.arange(1, n) * np.arange(n - 1, 0, -1)
+
+    return np.sqrt(np.pi) / (n * (n - 1)) * np.sum(weights * gaps)

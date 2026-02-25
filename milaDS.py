@@ -11,11 +11,11 @@ import numpy as np
 import os
 import scipy as sc
 from scipy import stats
-import random
-import tools_DS
+import sys
+import time
 
-# import matplotlib.pyplot as plt
-# plt.close()
+import tools_DS
+from astropy.stats import biweight_scale
 
 # data_glx_in_cluster = np.genfromtxt("bullet_xyv.dat")
 # 0:ID
@@ -34,11 +34,17 @@ def DSp_groups(
     Plim_P=None,
     Ng_jump=None,
     Ng_max=None,
-    overlapping_groups=False,
+    Ng_min=None,
     anti_fragmentation=True,
     compare_Method=None,
     auth_i=None,
     ddof=None,
+    seed=None,
+    shuffle=False,
+    sigma_1D_clus=None,
+    Vmean_clus=None,
+    Ngal_SigmaCompute=None,
+    r200=None,
 ):
     """
     Detection and characterization of substructures in galaxy clusters,
@@ -51,14 +57,17 @@ def DSp_groups(
     Zclus: redshift of the cluster. (float)
     cluster_name: String with the name of the cluster data. Is completely optional, by default is "cluster_proofs"
     nsims: integer with number of simulations, by default is 1000.
-    Plim_P: minimun probability of DS+ selection, in percent, by deafult is 10 (10%)
+    Plim_P: minimum probability of DS+ selection, in percent, by default is 1 (1%)
     Ng_jump: integer with number of multiplicity of assigned groups, by default is 3
-    Ng_max: integer with the maximun number of multipliplicity, by default is square(N_gal of the cluster)
-    overlapping_groups: If False, then when a galaxy is assigned to a DS+ group, all other groups to which that galaxy belongs are discarded, by default is False
-    anti_fragmentation: Combine one or more DS+ groups when the criteria of closeness and average group velocity are met, by defalut is True, and is necessary that overlapping_groups=False
+    Ng_max: integer with the maximun number of multipliplicity, by default is square(N_gal of the cluster)    
+    anti_fragmentation: Combine one or more DS+ groups when the criteria of closeness and average group velocity are met, by defalut is True
     compare_Method: type of profile comparison, you can select between: "NFW", "fit", "loess", by default is "loess"
-    auth_i: coefficients of model, by default is "MDvdB200"
-    ddof: degrees of freedom, by default is 1
+    auth_i: coefficients of model, by default is "MDvdB200"    
+    seed:if you want to always obtain the same subestructures values you can use a seed, by default if False. You can use any number
+    shuffle: you can activate this variable to shuffle the input data and avoid "location privileges". In general, it is not necessary, by default if False
+    sigma_1D_clus: the velocity dispersion of the cluster, if not set it is computed from the data
+    Vmean_clus: the mean velocity of the cluster, if not set it is computed from the data
+    Ngal_SigmaCompute: The limit on the number of galaxies used to estimate the velocity dispersion and decide between "gapper" (below this limit) or "biweight" (above this limit); by default is 15    
 
     Output:
 
@@ -67,23 +76,32 @@ def DSp_groups(
         - information of assignment of DS+ groups, with no-overlaping galaxies
         - summary of DS+ identified groups
 
-    Example brief running:
+    Example running:
 
     milaDS.DSp_groups(Xcoor=data_sample[:,1], Ycoor=data_sample[:,2], Vlos=data_sample[:,3], Zclus=0.296, cluster_name="Cl1", nsims=100, Plim_P=10)
 
     """
 
-    cluster_name = "cluster_proofs" if cluster_name is None else cluster_name
+    # new line, initialize rng:
+    rng = np.random.default_rng(seed)
+
+    cluster_name = "cluster_test" if cluster_name is None else cluster_name
     nsims = 1000 if nsims is None else nsims
     Plim_P = 1 if Plim_P is None else Plim_P
     Ng_jump = 3 if Ng_jump is None else Ng_jump
     Ng_max = int(np.sqrt(len(Xcoor))) if Ng_max is None else Ng_max
+    Ng_min = 3 if Ng_min is None else Ng_min
     compare_Method = "loess" if compare_Method is None else compare_Method
-    ddof = 1 if ddof is None else ddof
     auth_i = "MDvdB200" if auth_i is None else auth_i
+    Ngal_SigmaCompute = 15 if Ngal_SigmaCompute is None else Ngal_SigmaCompute
 
     ID_glx = range(len(Xcoor))
     data_glx_in_cluster = np.column_stack((ID_glx, Xcoor, Ycoor, Vlos))
+
+    if shuffle == True:
+        data_shuffled = data_glx_in_cluster.copy()
+        np.random.shuffle(data_shuffled)
+        data_glx_in_cluster = data_shuffled
 
     h_small = 0.6774
     G = (4.514e-39) * ((3.086e16) ** 2.0)  # G en unidades de km^2/s^2 *kpc/Msun
@@ -95,22 +113,25 @@ def DSp_groups(
         1.0 * Plim_P / 100
     )  # arbitrarial value, if necesary to check how change the results with other values of Plim
 
-    path_data_DS = "./data_DS_results/cluster_name_" + str(cluster_name) + "/"
+    path_data_DS = "./data_DS_results/" + str(cluster_name) + "/"
     if not os.path.exists(path_data_DS):
         os.makedirs(path_data_DS)
 
     path_data_DS_results = (
-        "./data_DS_results/cluster_name_"
-        + str(cluster_name)
-        + "/Plim_"
-        + str(Plim_P)
-        + "p/"
+        "./data_DS_results/" + str(cluster_name) + "/Plim_" + str(Plim_P) + "p/"
     )
     if not os.path.exists(path_data_DS_results):
         os.makedirs(path_data_DS_results)
 
-    Vmean_clus = np.mean(data_glx_in_cluster[:, 3])
-    sigma_1D_clus = np.std(data_glx_in_cluster[:, 3])
+    # mean velocity and velocity dispersion of the cluster:
+    Vmean_clus = (
+        np.mean(data_glx_in_cluster[:, 3]) if Vmean_clus is None else Vmean_clus
+    )
+
+    sigma_1D_clus = (
+        np.std(data_glx_in_cluster[:, 3]) if sigma_1D_clus is None else sigma_1D_clus
+    )
+    # print(sigma_1D_clus)
     V200_clus = np.sqrt(3.0) * sigma_1D_clus
 
     # Z_i = 0.296 # redshift
@@ -130,6 +151,12 @@ def DSp_groups(
     V200_clus = params_cluster[0]
     r200_clus = params_cluster[1]
     M200_clus = params_cluster[2]
+
+    r200 = r200_clus if r200 is None else r200
+
+    print(f"sigma_cluster = {sigma_1D_clus:.2f} km/s")
+    print(f"Vmean_cluster = {Vmean_clus:.2f} km/s")
+    print(f"r200_cluster = {r200:.2f} kpc")
 
     if compare_Method == "loess":
         # ----- equal number: ------
@@ -186,11 +213,13 @@ def DSp_groups(
     # Now, I will go to calculate the mean and dispersion velocities of the "linked" groups, following the multiplicity Ng(j) = j*3, j=1,2,... k
     # where Ng(k) > Nm^0.5, over each galaxy
     Ng_clus = len(data_glx_in_cluster)
-    Ng_max = np.sqrt(len(data_glx_in_cluster))
-    list_Ng = range(3, int(Ng_max), Ng_jump)
+    list_Ng = range(Ng_min, int(Ng_max) + 1, Ng_jump)
 
     data_DS_substructure = []
 
+    N_pcnt = len(data_glx_in_cluster)
+    last_percent = -1
+    start_time = time.time()
     for idx in range(0, len(data_glx_in_cluster)):
 
         sh_ID = data_glx_in_cluster[idx, 0].astype("int32")
@@ -214,10 +243,6 @@ def DSp_groups(
                 data_idx_and_dist[:, 1].argsort()
             ]
 
-            # size of the group:
-            # size_group_i = data_idx_and_dist_sort[Ng_j - 1, 1]
-            # size_group_i = tools_DS.size_group_mutualdistance_2D(data_glx_in_cluster[1:3, :])
-
             idx_interest = data_idx_and_dist_sort[0:Ng_j, 0].astype(
                 "int32"
             )  # return the index for n-gals of interes, including the reference galaxy
@@ -232,8 +257,7 @@ def DSp_groups(
             )
 
             av_dist = np.mean(data_glx_interest[:, 4])  # average distance to BCG
-            dist_gr_r200units = av_dist / r200_clus
-            # sigma_cl_at_GroupDist = V_cl_at_GroupDist/np.sqrt(3.) #sigma_LOS
+            dist_gr_r200units = av_dist / r200
 
             # using NFW profile:
             if compare_Method == "NFW":
@@ -281,7 +305,12 @@ def DSp_groups(
             X_square = sc.stats.chi2.ppf((1 - 0.16), (Ng_j - 1))
 
             V_mean_group = np.mean(data_glx_interest[:, 3])  # vel LOS
-            sigma_group = np.std(data_glx_interest[:, 3], ddof=1)
+
+            # calculate the disperison velocity using biweight or gapper methods:
+            if len(data_glx_interest) < Ngal_SigmaCompute:
+                sigma_group = tools_DS.gapper_scale(data_glx_interest[:, 3])
+            if len(data_glx_interest) >= Ngal_SigmaCompute:
+                sigma_group = biweight_scale(data_glx_interest[:, 3])
 
             # delta v:
             delta_v = (
@@ -302,18 +331,24 @@ def DSp_groups(
             for ss in range(N_sims):
 
                 # we generate Ncl random numbers (with a normal distribution):
-                random_vals = np.random.normal(
-                    loc=0, scale=sigma_cl_at_GroupDist, size=Ng_clus
+
+                # updated lines:
+                random_vals = rng.normal(
+                    loc=0.0, scale=sigma_cl_at_GroupDist, size=Ng_clus
                 )
 
-                # Now, extract Ng_j random index:
-                idx_random = random.sample(range(Ng_clus), Ng_j)
+                idx_random = rng.choice(Ng_clus, size=Ng_j, replace=False)
 
                 # random velocities:
                 Vel_gal_sim = random_vals[idx_random]
 
                 V_mean_group_sim = np.mean(Vel_gal_sim)  # vel LOS
-                sigma_group_sim = np.std(Vel_gal_sim, ddof=ddof)
+
+                # calculate the disperison velocity using biweight or gapper methods:
+                if len(Vel_gal_sim) < Ngal_SigmaCompute:
+                    sigma_group_sim = tools_DS.gapper_scale(Vel_gal_sim)
+                if len(Vel_gal_sim) >= Ngal_SigmaCompute:
+                    sigma_group_sim = biweight_scale(Vel_gal_sim)
 
                 # delta v:
                 delta_v_sim = (
@@ -350,8 +385,6 @@ def DSp_groups(
                 np.where(data_sim_deltas[:, 3] > delta_sigma)[0]
             )  # same for sigma
             P_sigma = (1.0 * N_delta_sigma_above) / N_sims
-
-            # print "P_v=", P_v, "P_sigma=",P_sigma
             # ******************************************************************
 
             # Minimun value between Pv and Ps:
@@ -374,9 +407,28 @@ def DSp_groups(
             )
             # --------------------------------------------------------
 
+        # printing percent of process:
+        percent = int(100 * (idx + 1) / N_pcnt)
+        if percent != last_percent:
+            elapsed = int(time.time() - start_time)  # seconds elapsed
+
+            # convert to dd:hh:mm:ss
+            days = elapsed // 86400
+            hours = (elapsed % 86400) // 3600
+            minutes = (elapsed % 3600) // 60
+            seconds = elapsed % 60
+
+            sys.stdout.write(
+                f"\rProgress: {percent}% | Elapsed: {days:02d}:{hours:02d}:{minutes:02d}:{seconds:02d}"
+            )
+            sys.stdout.flush()
+            last_percent = percent
+    print(" ")  # Done
+    # -----------------------------
+
     data_DS_substructure = np.array(data_DS_substructure)
     # 0:idx galaxies
-    # 1:sh ID
+    # 1:gal ID
     # 2:Ngal: multiplicity
     # 3:average Rij distance
     # 4:size of group
@@ -389,12 +441,7 @@ def DSp_groups(
 
     data_header = " idx_gal   gal_id   Ngal    Ri_avr(kpc)  size_i(kpc)   sigma_i(km/s)   delta_v    delta_sigma     P_v      P_sigma    Pmin(ds)"
     np.savetxt(
-        path_data_DS
-        + "data_DS_cluster_N_"
-        + str(cluster_name)
-        + "_"
-        + str(nsims)
-        + "sims.dat",
+        path_data_DS + "data_DS_" + str(cluster_name) + "_" + str(nsims) + "sims.dat",
         data_DS_substructure,
         header=data_header,
         fmt=[
@@ -412,28 +459,46 @@ def DSp_groups(
         ],
     )
 
+    # sort by distance:
+    data_DS_substructure = data_DS_substructure[data_DS_substructure[:, 3].argsort()]
+    data_DS_substructure = data_DS_substructure[::-1]
+
     print("end DS+ individual probabilities")
 
-    # ****** Part 2 location program, using the nooverlaping principle: ********
+    # ****** Part 2 location program: ********
 
-    # first we need to generate a matrix with min(Pv,Ps), Ng_mult, idx_g, and then sort by the lowest probability:
-    data_sort_by_Mult = np.zeros((1, 11))
+    # ----- new way to select the groups: -----
+    data_DS_to_groups = data_DS_substructure[data_DS_substructure[:, 10] <= Plim]
+    idgals_to_grs = np.unique(data_DS_to_groups[:, 1])
+    data_DS_to_groups_reduced = -1 * np.zeros((len(idgals_to_grs), 11))
+    for gg in range(len(idgals_to_grs)):
+        idgal_i = idgals_to_grs[gg]
+        rows_gali = np.where(data_DS_to_groups[:, 1] == idgal_i)[0]
+        data_DS_to_groups_gali = data_DS_to_groups[rows_gali, :]
+        min_Mult = min(data_DS_to_groups_gali[:, 2])
+        row_minMult = np.where(data_DS_to_groups_gali[:, 2] == min_Mult)[0][0]
+        # generating the new simplified array:
+        data_DS_to_groups_reduced[gg, 0] = data_DS_to_groups_gali[row_minMult, 0]
+        data_DS_to_groups_reduced[gg, 1] = data_DS_to_groups_gali[row_minMult, 1]
+        data_DS_to_groups_reduced[gg, 2] = data_DS_to_groups_gali[row_minMult, 2]
+        data_DS_to_groups_reduced[gg, 3] = data_DS_to_groups_gali[row_minMult, 3]
+        data_DS_to_groups_reduced[gg, 4] = data_DS_to_groups_gali[row_minMult, 4]
+        data_DS_to_groups_reduced[gg, 5] = data_DS_to_groups_gali[row_minMult, 5]
+        data_DS_to_groups_reduced[gg, 6] = data_DS_to_groups_gali[row_minMult, 6]
+        data_DS_to_groups_reduced[gg, 7] = data_DS_to_groups_gali[row_minMult, 7]
+        data_DS_to_groups_reduced[gg, 8] = data_DS_to_groups_gali[row_minMult, 8]
+        data_DS_to_groups_reduced[gg, 9] = data_DS_to_groups_gali[row_minMult, 9]
+        data_DS_to_groups_reduced[gg, 10] = data_DS_to_groups_gali[row_minMult, 10]
 
-    for Ng_j in list_Ng:
-        data_DS_prob_Mult = data_DS_substructure[data_DS_substructure[:, 2] == Ng_j]
-        data_sort_by_Mult = np.vstack((data_sort_by_Mult, data_DS_prob_Mult))
+    data_below_Plim = data_DS_to_groups_reduced[
+        data_DS_to_groups_reduced[:, 2].argsort()
+    ]
 
-    data_sort_by_Mult = data_sort_by_Mult[1:, :]
+    # -----------------------------------------
 
-    # now I need to sort information by ds minimum value:
-    data_sort_by_ds = data_sort_by_Mult[data_sort_by_Mult[:, 10].argsort()]
-
-    # We only consider galaxies with Pmin < Plim:
-    data_below_Plim = data_sort_by_ds[data_sort_by_ds[:, 10] < Plim]
-
-    allocation_data = np.zeros((Ng_clus, 12))
+    allocation_data = np.zeros((Ng_clus, 13))
     # 0:idx galaxies
-    # 1:sh ID
+    # 1:gal ID
     # 2:Ngali: multiplicity proposed initially
     # 3:Ngalf: multiplicity after of assignation
     # 4:average Rij distance
@@ -441,13 +506,15 @@ def DSp_groups(
     # 6:sigma_LOS
     # 7:Pmin min(Pv, Ps)
     # 8:GrNr
-    # 9-11:(X,Y) pos
+    # 9-10:(X,Y) pos
     # 11:V_LOS
+    # 12:gal ID main of group
 
-    # Iniial values:
+    # Initial values:
     allocation_data[:, 0] = np.arange(Ng_clus)  # index
     allocation_data[:, 8] = -1  # initial fictitious GrNr
     allocation_data[:, 7] = -1  # initial fictitious Plim
+    allocation_data[:, 12] = -1  # gal ID main of group
 
     list_idx = []
     for nn in range(len(data_below_Plim)):
@@ -465,18 +532,17 @@ def DSp_groups(
             continue
         # ++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-        data_gal_i_sort_by_ds = data_below_Plim[data_below_Plim[:, 0] == idx]
-        Ngal_i = min(data_gal_i_sort_by_ds[:, 2].astype("int32"))
-        row_Ngal_i = np.where(data_gal_i_sort_by_ds[:, 2] == Ngal_i)[0][0]
-
+        # ---- new: -----
+        row_idx = np.where(data_below_Plim[:, 0] == idx)[0][0]
         # data group:
-        shID_i = data_gal_i_sort_by_ds[row_Ngal_i, 1].astype("int32")  # "main" galaxy
-        Rij_i = data_gal_i_sort_by_ds[row_Ngal_i, 3]
-        size_i = data_gal_i_sort_by_ds[row_Ngal_i, 4]
-        sigma_i = data_gal_i_sort_by_ds[row_Ngal_i, 5]
-        Pmin_i = data_gal_i_sort_by_ds[row_Ngal_i, 10]
+        galIDmain_i = data_below_Plim[row_idx, 1].astype("int32")  # "main" galaxy
+        Ngal_i = data_below_Plim[row_idx, 2].astype("int32")
+        Rij_i = data_below_Plim[row_idx, 3]
+        size_i = data_below_Plim[row_idx, 4]
+        sigma_i = data_below_Plim[row_idx, 5]
+        Pmin_i = data_below_Plim[row_idx, 10]
         GrNr_i = count
-        # print("Pmin:", Pmin_i)
+        # ---------------
 
         # -------- now to obtain the informatio for the group members: --------
 
@@ -512,16 +578,13 @@ def DSp_groups(
             continue
 
         # ++++++++ overlapping condition: +++++++++
-        if overlapping_groups == False:
-            if np.sum(allocation_data[idx_interest, 8]) != -1 * len(idx_interest):
-                continue
-        if overlapping_groups == True:
-            pass
+        if np.sum(allocation_data[idx_interest, 8]) != -1 * len(idx_interest):
+            continue
         # +++++++++++++++++++++++++++++++++++++++++
 
         # print "Ngals:", Ngal_i
         for jj in idx_interest:
-            # print "gal_j:", jj
+
             # ++++ again the condition for galaxies that were assigned: ++++
             if allocation_data[jj, 8] != -1:
                 continue
@@ -533,10 +596,10 @@ def DSp_groups(
             allocation_data[jj, 4] = Rij_i  # average Rij distance
             allocation_data[jj, 5] = size_i  # 5:size of group
             allocation_data[jj, 6] = sigma_i  # 6:sigma_LOS
-            # allocation_data[jj,8] = Pmin_i #7:Pmin min(Pv, Ps)
             allocation_data[jj, 8] = GrNr_i  # 8:GrNr
             allocation_data[jj, 9:11] = data_glx_in_cluster[jj, 1:3]  # (X,Y) pos in kpc
             allocation_data[jj, 11] = data_glx_in_cluster[jj, 3]  # vel LOS in km/s
+            allocation_data[jj, 12] = galIDmain_i  # id "main" galaxy:
 
             # Plim for individual galaxy:
             row_gid = np.where(
@@ -546,7 +609,6 @@ def DSp_groups(
             row_ngi = np.where(info_gid[:, 2] == Ngal_i)[0][0]
             Pmin_gid = info_gid[row_ngi, 10]
             allocation_data[jj, 7] = Pmin_gid
-            # print "gal:",data_glx_in_cluster[jj,0], "Pmin_i:",Pmin_gid
 
         # ----
         count += 1
@@ -564,8 +626,8 @@ def DSp_groups(
             idx_kk, 3
         ]  # (Vx,Vy,Vz) vels in km/s
 
-    data_above_Plim = data_sort_by_ds[
-        data_sort_by_ds[:, 10] >= Plim
+    data_above_Plim = data_DS_substructure[
+        data_DS_substructure[:, 10] > Plim
     ]  # galaxies wihout group
 
     list_singles_reallocated = []
@@ -587,7 +649,7 @@ def DSp_groups(
         allocation_data[rows_GrNr, 3] = Ngalf_gr
 
     # =============== anti-fragmentation process: ====================
-    if overlapping_groups == False and anti_fragmentation == True:
+    if anti_fragmentation == True:
         list_Gr_DS = []
         pmin_Gr_DS = []
         for gg in range(len(allocation_data)):
@@ -658,19 +720,19 @@ def DSp_groups(
         for mm in range(len(merg_lost)):
             gr_add_i = merg_lost[mm, 0]
             gr_lost_i = merg_lost[mm, 1]
-            row_gr_merg = np.where(allocation_data[:, 9] == gr_lost_i)[0]
-            allocation_data[row_gr_merg, 9] = gr_add_i
+            row_gr_merg = np.where(allocation_data[:, 8] == gr_lost_i)[0]
+            allocation_data[row_gr_merg, 8] = gr_add_i
     # ================================================================
 
     # save results:
-    data_header_allocate = " idx_gal   shID  Ngali  Ngalf    Rij(kpc)  size(kpc)  sigm(km/s)  Pmin(ds)    GrNr    x(kpc)    y(kpc)   V_LOS(km/s)"
+    data_header_allocate = " idx_gal   galID  Ngali  Ngalf    Rij(kpc)  size(kpc)  sigm(km/s)  Pmin(ds)    GrNr   x(kpc)    y(kpc)   V_LOS(km/s)   galID_main"
     np.savetxt(
         path_data_DS_results
         + "data_DS_groups_allocation_Plim_"
         + str(Plim_P)
-        + "_"
+        + "p_"
         + str(nsims)
-        + "sims_cluster_N_"
+        + "sims_"
         + str(cluster_name)
         + ".dat",
         allocation_data,
@@ -688,11 +750,12 @@ def DSp_groups(
             "%10.2f",
             "%10.2f",
             "%10.2f",
+            "%8.f",
         ],
     )
 
     # 0:idx galaxies
-    # 1:sh ID
+    # 1:gal ID
     # 2:Ngali: multiplicity proposed initially
     # 3:Ngalf: multiplicity after of assignation
     # 4:average Rij distance
@@ -702,6 +765,7 @@ def DSp_groups(
     # 8:GrNr
     # 9-10:(X,Y) pos
     # 11:V_LOS
+    # 12:gal ID main of group
 
     print("end DS+ groups location")
     # ************************************************************************
@@ -737,16 +801,19 @@ def DSp_groups(
     if summary_DS_grs.shape == (0,):
         print("groups not found")
 
-    if len(summary_DS_grs) > 1:
+    if summary_DS_grs.shape == (8,):
+        summary_DS_grs = summary_DS_grs.reshape(1, 8)
+
+    if len(summary_DS_grs) >= 1:
         summary_DS_grs = summary_DS_grs[summary_DS_grs[:, 0].argsort()]
         data_header_summary = "  GrNr    Ngal    Rij(kpc)  size(kpc)  sigm(km/s)  Vmean(km/s) Pmin(ds)   Pmin_avr(ds)"
         np.savetxt(
             path_data_DS_results
-            + "summary_data_DS_groups_"
+            + "summary_data_DS_groups_Plim_"
             + str(Plim_P)
-            + "_"
+            + "p_"
             + str(nsims)
-            + "sims_cluster_N_"
+            + "sims_"
             + str(cluster_name)
             + ".dat",
             summary_DS_grs,
